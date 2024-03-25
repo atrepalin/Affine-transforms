@@ -15,9 +15,27 @@ decltype(auto) map(const std::vector<T> a, const F fn)
 
 int main(int argc, char *argv[])
 {
+    double angle,
+        horizontal_scale,
+        vertical_scale,
+        scale,
+        horizontal_skew,
+        vertical_skew;
+
+    angle *= M_PI / 180;
+    horizontal_skew *= M_PI / 180;
+    vertical_skew *= M_PI / 180;
+
+    double a, b, c, d;
+
+    a = horizontal_scale * cos(angle),
+    b = -horizontal_scale * (sin(angle) + tan(horizontal_skew)),
+    c = vertical_scale * (sin(angle) + tan(vertical_skew)),
+    d = vertical_scale * cos(angle);
+
     std::vector<std::vector<double>> matrix = {
-        {1, 0, 0},
-        {0, 1, 0},
+        {a, b, 0},
+        {c, d, 0},
         {0, 0, 1}};
 
     auto invMatrix = inverseMatrix(matrix);
