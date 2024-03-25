@@ -1,0 +1,6 @@
+build
+.vscode
+*.exe
+*.bmp
+CMakeFiles
+CMakeCache.txt
