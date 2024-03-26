@@ -4,6 +4,9 @@
 #include <algorithm>
 #include "matrix.hpp"
 #include "BitmapPlusPlus.hpp"
+#include <thread>
+#include <mutex>
+#include <iomanip>
 #include <boost/program_options.hpp>
 
 namespace po = boost::program_options;
@@ -42,6 +45,25 @@ std::vector<po::option> ignore_numbers(std::vector<std::string> &args)
     return result;
 }
 
+void printProgress(const double progress)
+{
+    std::cout << "[";
+    int pos = 100 * progress;
+    for (int i = 0; i < 100; ++i)
+    {
+        if (i < pos)
+            std::cout << "=";
+        else if (i == pos)
+            std::cout << ">";
+        else
+            std::cout << " ";
+    }
+    std::cout << "] " << std::setprecision(1) << int(progress * 1000) / 10.0 << std::fixed << " %\r";
+    std::cout.flush();
+}
+
+std::mutex mutex;
+
 int main(int argc, char *argv[])
 {
     double angle,
@@ -51,19 +73,23 @@ int main(int argc, char *argv[])
         horizontal_skew,
         vertical_skew;
 
+    int threads_number;
+    int device;
+
     po::options_description desc("Allowed options");
     desc
-        .add_options()                                                                                                                      // prettier-ignore
-        ("help,h", "produce help message")                                                                                                  // prettier-ignore
-        ("angle,a", po::value<double>(&angle)->default_value(0), "rotation angle")                                                          // prettier-ignore
-        ("hsc", po::value<double>(&horizontal_scale)->default_value(1), "horizontal scale factor")                                          // prettier-ignore
-        ("vsc", po::value<double>(&vertical_scale)->default_value(1), "vertical scale factor")                                              // prettier-ignore
-        ("scale,s", po::value<double>(&scale), "scale factor (overrides hsc and vsc)")                                                      // prettier-ignore
-        ("hsk", po::value<double>(&horizontal_skew)->default_value(0), "horizontal skew angle")                                             // prettier-ignore
-        ("vsk", po::value<double>(&vertical_skew)->default_value(0), "vertical skew angle")                                                 // prettier-ignore
-        ("hf", "horizontal flip")                                                                                                           // prettier-ignore
-        ("vf", "vertical flip")                                                                                                             // prettier-ignore
-        ("matrix,m", po::value<std::vector<double>>()->multitoken(), "transformation matrix (2x2 as a1 a2 b1 b2) (overrides all options)"); // prettier-ignore
+        .add_options()                                                                                                                     // prettier-ignore
+        ("help,h", "produce help message")                                                                                                 // prettier-ignore
+        ("angle,a", po::value<double>(&angle)->default_value(0), "rotation angle")                                                         // prettier-ignore
+        ("hsc", po::value<double>(&horizontal_scale)->default_value(1), "horizontal scale factor")                                         // prettier-ignore
+        ("vsc", po::value<double>(&vertical_scale)->default_value(1), "vertical scale factor")                                             // prettier-ignore
+        ("scale,s", po::value<double>(&scale), "scale factor (overrides hsc and vsc)")                                                     // prettier-ignore
+        ("hsk", po::value<double>(&horizontal_skew)->default_value(0), "horizontal skew angle")                                            // prettier-ignore
+        ("vsk", po::value<double>(&vertical_skew)->default_value(0), "vertical skew angle")                                                // prettier-ignore
+        ("hf", "horizontal flip")                                                                                                          // prettier-ignore
+        ("vf", "vertical flip")                                                                                                            // prettier-ignore
+        ("matrix,m", po::value<std::vector<double>>()->multitoken(), "transformation matrix (2x2 as a1 a2 b1 b2) (overrides all options)") // prettier-ignore
+        ("device,d", po::value<int>(&device)->default_value(1), "render device: 1) CPU 2) GPU");                                           // prettier-ignore
 
     po::options_description hidden;
     hidden.add_options()                           // prettier-ignore
@@ -204,23 +230,51 @@ int main(int argc, char *argv[])
 
         bmp::Bitmap output(new_width, new_height);
 
-        for (int new_x = 0; new_x < new_width; ++new_x)
+        int chunk_size = ceil(new_width / (double)threads_number);
+
+        std::vector<std::thread> threads(threads_number);
+
+        double progress = 0;
+        int checkpoint = (int)ceil(new_width / 100.0);
+
+        for (int i = 0; i < threads_number; ++i)
         {
-            for (int new_y = 0; new_y < new_height; ++new_y)
-            {
-                std::vector<std::vector<double>> transformed_coord = {{(double)(new_x + x_offset), (double)(new_y + y_offset), 1}};
+            threads[i] = std::thread(
+                [=, &output, &progress] // prettier-ignore
+                {                       // prettier-ignore
+                    for (int new_x = i * chunk_size; new_x < std::min((i + 1) * chunk_size, new_width); ++new_x)
+                    {
+                        for (int new_y = 0; new_y < new_height; ++new_y)
+                        {
+                            std::vector<std::vector<double>> transformed_coord = {{(double)(new_x + x_offset), (double)(new_y + y_offset), 1}};
 
-                auto coord = multiplyMatrices(transformed_coord, invMatrix);
+                            auto coord = multiplyMatrices(transformed_coord, invMatrix);
 
-                int x = round(coord[0][0]),
-                    y = round(coord[0][1]);
+                            int x = round(coord[0][0]),
+                                y = round(coord[0][1]);
 
-                if (x < 0 || x >= width || y < 0 || y >= height)
-                    continue;
+                            if (x < 0 || x >= width || y < 0 || y >= height)
+                                continue;
 
-                output.set(new_x, new_y, input.get(x, y));
-            }
+                            output.set(new_x, new_y, input.get(x, y));
+                        }
+
+                        progress += 1.0 / new_width;
+
+                        if (new_x % checkpoint == 0)
+                        {
+                            mutex.lock();
+                            printProgress(progress);
+                            mutex.unlock();
+                        }
+                    }
+                });
         }
+
+        for (auto &t : threads)
+            t.join();
+
+        printProgress(1);
 
         output.save(out);
         return 0;
