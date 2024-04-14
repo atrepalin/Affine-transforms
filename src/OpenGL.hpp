@@ -103,6 +103,12 @@ GLuint createShader(GLuint *VertexShader, GLuint *FragmentShader, GLint *Positio
         uniform float c;
         uniform float d;
 
+        vec4 bilinearInterpolation(vec3 p1, vec3 p2, vec3 p3, vec3 p4, float dx, float dy) {
+            vec3 top = mix(p1, p2, dx);
+            vec3 bottom = mix(p3, p4, dx);
+            return vec4(mix(top, bottom, dy), 1);
+        }
+
         void main()
         {
             vec2 new_coord = gl_FragCoord.xy;
@@ -112,7 +118,17 @@ GLuint createShader(GLuint *VertexShader, GLuint *FragmentShader, GLint *Positio
             coord *= mat3(a, c, 0, b, d, 0, 0, 0, 1);
 
             if(coord.x > 0 && coord.x < width && coord.y > 0 && coord.y < height) {
-                outColor = texture2D(image, coord.xy / vec2(width, height));
+                vec2 xy = vec2(floor(coord.x), floor(coord.y));
+                vec2 size = vec2(width, height);
+
+                vec3 p1 = texture2D(image, xy / size).rgb,
+                     p2 = texture2D(image, (xy + vec2(1, 0)) / size).rgb,
+                     p3 = texture2D(image, (xy + vec2(0, 1)) / size).rgb,
+                     p4 = texture2D(image, (xy + vec2(1, 1)) / size).rgb;
+
+                vec2 dc = coord.xy - xy;
+
+                outColor = bilinearInterpolation(p1, p2, p3, p4, dc.x, dc.y);
             }
         }
     )GLSL";

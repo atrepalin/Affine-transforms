@@ -29,6 +29,25 @@ void printProgress(const double progress)
 
 std::mutex mutex;
 
+bmp::Pixel bilinearInterpolation(
+    const bmp::Pixel &p1,
+    const bmp::Pixel &p2,
+    const bmp::Pixel &p3,
+    const bmp::Pixel &p4,
+    double d1,
+    double d2,
+    double d3,
+    double d4)
+{
+    bmp::Pixel result;
+
+    result.r = p1.r * d1 + p2.r * d2 + p3.r * d3 + p4.r * d4;
+    result.g = p1.g * d1 + p2.g * d2 + p3.g * d3 + p4.g * d4;
+    result.b = p1.b * d1 + p2.b * d2 + p3.b * d3 + p4.b * d4;
+
+    return result;
+}
+
 bmp::Bitmap CPU(int width, int height,
                 int new_width, int new_height,
                 int x_offset, int y_offset,
@@ -60,13 +79,31 @@ bmp::Bitmap CPU(int width, int height,
 
                         auto coord = multiplyMatrices(transformed_coord, invMatrix);
 
-                        int x = round(coord[0][0]),
-                            y = round(coord[0][1]);
+                        double x = coord[0][0],
+                               y = coord[0][1];
 
                         if (x < 0 || x >= width || y < 0 || y >= height)
                             continue;
 
-                        output.set(new_x, new_y, input.get(x, y));
+                        int ix = std::floor(x),
+                            iy = std::floor(y);
+
+                        auto p1 = input.get(ix, iy),
+                             p2 = input.get(ix + (ix < width), iy),
+                             p3 = input.get(ix, iy + (iy < height)),
+                             p4 = input.get(ix + (ix < width), iy + (iy < width));
+
+                        double t = x - ix,
+                               u = y - iy,
+                               d1 = (1 - t) * (1 - u),
+                               d2 = t * (1 - u),
+                               d3 = t * u,
+                               d4 = (1 - t) * u;
+
+                        auto pixel = bilinearInterpolation(p1, p2, p3, p4,
+                                                           d1, d2, d3, d4);
+
+                        output.set(new_x, new_y, pixel);
                     }
 
                     progress += 1.0 / new_width;
