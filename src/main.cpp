@@ -43,6 +43,28 @@ std::vector<po::option> ignore_numbers(std::vector<std::string> &args)
     return result;
 }
 
+std::vector<std::vector<double>> genMatrix(double angle,
+                                           double horizontal_scale,
+                                           double vertical_scale,
+                                           double scale,
+                                           double horizontal_skew,
+                                           double vertical_skew)
+{
+    angle *= M_PI / 180;
+    horizontal_skew *= M_PI / 180;
+    vertical_skew *= M_PI / 180;
+
+    double
+        a = horizontal_scale * cos(angle),
+        b = -horizontal_scale * (sin(angle) + tan(horizontal_skew)),
+        c = vertical_scale * (sin(angle) + tan(vertical_skew)),
+        d = vertical_scale * cos(angle);
+
+    return {{a, b, 0},
+            {c, d, 0},
+            {0, 0, 1}};
+}
+
 int main(int argc, char *argv[])
 {
     double angle,
@@ -114,7 +136,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    double a, b, c, d;
+    std::vector<std::vector<double>> matrix;
 
     if (!vm.count("matrix"))
     {
@@ -143,14 +165,13 @@ int main(int argc, char *argv[])
             return 1;
         }
 
-        angle *= M_PI / 180;
-        horizontal_skew *= M_PI / 180;
-        vertical_skew *= M_PI / 180;
-
-        a = horizontal_scale * cos(angle),
-        b = -horizontal_scale * (sin(angle) + tan(horizontal_skew)),
-        c = vertical_scale * (sin(angle) + tan(vertical_skew)),
-        d = vertical_scale * cos(angle);
+        matrix = genMatrix(
+            angle,
+            horizontal_scale,
+            vertical_scale,
+            scale,
+            horizontal_skew,
+            vertical_skew);
     }
     else
     {
@@ -162,16 +183,11 @@ int main(int argc, char *argv[])
             return 1;
         }
 
-        a = vector[0],
-        b = vector[1],
-        c = vector[2],
-        d = vector[3];
+        matrix = {
+            {vector[0], vector[1], 0},
+            {vector[2], vector[3], 0},
+            {0, 0, 1}};
     }
-
-    std::vector<std::vector<double>> matrix = {
-        {a, b, 0},
-        {c, d, 0},
-        {0, 0, 1}};
 
     auto invMatrix = inverseMatrix(matrix);
 
