@@ -51,11 +51,12 @@ bmp::Bitmap CPU(int width, int height,
         threads[i] = std::thread(
             [=, &output, &progress] // prettier-ignore
             {                       // prettier-ignore
+                std::vector<std::vector<double>> transformed_coord;
                 for (int new_x = i * chunk_size; new_x < std::min((i + 1) * chunk_size, new_width); ++new_x)
                 {
                     for (int new_y = 0; new_y < new_height; ++new_y)
                     {
-                        std::vector<std::vector<double>> transformed_coord = {{(double)(new_x + x_offset), (double)(new_y + y_offset), 1}};
+                        transformed_coord = {{(double)(new_x + x_offset), (double)(new_y + y_offset), 1}};
 
                         auto coord = multiplyMatrices(transformed_coord, invMatrix);
 
@@ -72,9 +73,8 @@ bmp::Bitmap CPU(int width, int height,
 
                     if (new_x % checkpoint == 0)
                     {
-                        mutex.lock();
+                        const std::unique_lock<std::mutex> lock(mutex);
                         printProgress(progress);
-                        mutex.unlock();
                     }
                 }
             });
