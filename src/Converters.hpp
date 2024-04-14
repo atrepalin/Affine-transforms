@@ -48,13 +48,12 @@ bmp::Pixel bilinearInterpolation(
     return result;
 }
 
-bmp::Bitmap CPU(int width, int height,
-                int new_width, int new_height,
-                int x_offset, int y_offset,
-                std::vector<std::vector<double>> invMatrix,
-                bmp::Bitmap input,
-
-                int threads_number)
+bmp::Bitmap CPURender(int width, int height,
+                      int new_width, int new_height,
+                      int x_offset, int y_offset,
+                      std::vector<std::vector<double>> invMatrix,
+                      bmp::Bitmap input,
+                      int threads_number)
 {
     bmp::Bitmap output(new_width, new_height);
 
@@ -70,49 +69,56 @@ bmp::Bitmap CPU(int width, int height,
         threads[i] = std::thread(
             [=, &output, &progress] // prettier-ignore
             {                       // prettier-ignore
-                std::vector<std::vector<double>> transformed_coord;
-                for (int new_x = i * chunk_size; new_x < std::min((i + 1) * chunk_size, new_width); ++new_x)
+                try
                 {
-                    for (int new_y = 0; new_y < new_height; ++new_y)
+                    std::vector<std::vector<double>> transformed_coord;
+                    for (int new_x = i * chunk_size; new_x < std::min((i + 1) * chunk_size, new_width); ++new_x)
                     {
-                        transformed_coord = {{(double)(new_x + x_offset), (double)(new_y + y_offset), 1}};
+                        for (int new_y = 0; new_y < new_height; ++new_y)
+                        {
+                            transformed_coord = {{(double)(new_x + x_offset), (double)(new_y + y_offset), 1}};
 
-                        auto coord = multiplyMatrices(transformed_coord, invMatrix);
+                            auto coord = multiplyMatrices(transformed_coord, invMatrix);
 
-                        double x = coord[0][0],
-                               y = coord[0][1];
+                            double x = coord[0][0],
+                                   y = coord[0][1];
 
-                        if (x < 0 || x >= width || y < 0 || y >= height)
-                            continue;
+                            if (x < 0 || x >= width || y < 0 || y >= height)
+                                continue;
 
-                        int ix = std::floor(x),
-                            iy = std::floor(y);
+                            int ix = std::floor(x),
+                                iy = std::floor(y);
 
-                        auto p1 = input.get(ix, iy),
-                             p2 = input.get(ix + (ix < width), iy),
-                             p3 = input.get(ix, iy + (iy < height)),
-                             p4 = input.get(ix + (ix < width), iy + (iy < width));
+                            auto p1 = input.get(ix, iy),
+                                 p2 = input.get(ix + (ix < width), iy),
+                                 p3 = input.get(ix, iy + (iy < height)),
+                                 p4 = input.get(ix + (ix < width), iy + (iy < width));
 
-                        double t = x - ix,
-                               u = y - iy,
-                               d1 = (1 - t) * (1 - u),
-                               d2 = t * (1 - u),
-                               d3 = t * u,
-                               d4 = (1 - t) * u;
+                            double t = x - ix,
+                                   u = y - iy,
+                                   d1 = (1 - t) * (1 - u),
+                                   d2 = t * (1 - u),
+                                   d3 = t * u,
+                                   d4 = (1 - t) * u;
 
-                        auto pixel = bilinearInterpolation(p1, p2, p3, p4,
-                                                           d1, d2, d3, d4);
+                            auto pixel = bilinearInterpolation(p1, p2, p3, p4,
+                                                               d1, d2, d3, d4);
 
-                        output.set(new_x, new_y, pixel);
+                            output.set(new_x, new_y, pixel);
+                        }
+
+                        progress += 1.0 / new_width;
+
+                        if (new_x % checkpoint == 0)
+                        {
+                            const std::unique_lock<std::mutex> lock(mutex);
+                            printProgress(progress);
+                        }
                     }
-
-                    progress += 1.0 / new_width;
-
-                    if (new_x % checkpoint == 0)
-                    {
-                        const std::unique_lock<std::mutex> lock(mutex);
-                        printProgress(progress);
-                    }
+                }
+                catch (const std::runtime_error &e)
+                {
+                    std::cout << e.what() << std::endl;
                 }
             });
     }
@@ -127,11 +133,11 @@ bmp::Bitmap CPU(int width, int height,
     return output;
 }
 
-bmp::Bitmap GPU(int width, int height,
-                int new_width, int new_height,
-                int x_offset, int y_offset,
-                std::vector<std::vector<double>> invMatrix,
-                bmp::Bitmap input)
+bmp::Bitmap GPURender(int width, int height,
+                      int new_width, int new_height,
+                      int x_offset, int y_offset,
+                      std::vector<std::vector<double>> invMatrix,
+                      bmp::Bitmap input)
 {
     init(new_width, new_height);
 

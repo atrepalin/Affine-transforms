@@ -228,18 +228,18 @@ int main(int argc, char *argv[])
 
         if (device == 1)
         {
-            output = CPU(width, height,
-                         new_width, new_height,
-                         x_offset, y_offset,
-                         invMatrix, input,
-                         threads_number);
+            output = CPURender(width, height,
+                               new_width, new_height,
+                               x_offset, y_offset,
+                               invMatrix, input,
+                               threads_number);
         }
         else if (device == 2)
         {
-            output = GPU(width, height,
-                         new_width, new_height,
-                         x_offset, y_offset,
-                         invMatrix, input);
+            output = GPURender(width, height,
+                               new_width, new_height,
+                               x_offset, y_offset,
+                               invMatrix, input);
         }
         else
         {
