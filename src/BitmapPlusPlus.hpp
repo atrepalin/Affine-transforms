@@ -542,61 +542,6 @@ namespace bmp
         throw Exception("Bitmap::Save(\"" + filename + "\"): Failed to save pixels to file.");
     }
 
-    void save(const std::string &filename, const unsigned char *data)
-    {
-      // Calculate row and bitmap size
-      const std::int32_t row_size = m_width * 3 + m_width % 4;
-      const std::uint32_t bitmap_size = row_size * m_height;
-
-      // Construct bitmap header
-      BitmapHeader header{};
-      /* Bitmap file header structure */
-      header.magic = BITMAP_BUFFER_MAGIC;
-      header.file_size = bitmap_size + sizeof(BitmapHeader);
-      header.reserved1 = 0;
-      header.reserved2 = 0;
-      header.offset_bits = sizeof(BitmapHeader);
-      /* Bitmap file info structure */
-      header.size = 40;
-      header.width = m_width;
-      header.height = m_height;
-      header.planes = 1;
-      header.bits_per_pixel = sizeof(Pixel) * 8; // 24bpp
-      header.compression = 0;
-      header.size_image = bitmap_size;
-      header.x_pixels_per_meter = 0;
-      header.y_pixels_per_meter = 0;
-      header.clr_used = 0;
-      header.clr_important = 0;
-
-      // Save bitmap to output file
-      if (std::ofstream ofs{filename, std::ios::binary})
-      {
-        // Write Header
-        ofs.write(reinterpret_cast<const char *>(&header), sizeof(BitmapHeader));
-
-        // Write Pixels
-        std::vector<std::uint8_t> line(row_size);
-        for (std::int32_t y = m_height - 1; y >= 0; --y)
-        {
-          std::size_t i = 0;
-          for (std::int32_t x = 0; x < m_width; ++x)
-          {
-            int index = IX(x, y) * 3 + 2;
-            line[i++] = data[index--];
-            line[i++] = data[index--];
-            line[i++] = data[index--];
-          }
-          ofs.write(reinterpret_cast<const char *>(line.data()), line.size());
-        }
-
-        // Close File
-        ofs.close();
-      }
-      else
-        throw Exception("Bitmap::Save(\"" + filename + "\"): Failed to save pixels to file.");
-    }
-
     /**
      *	Loads Bitmap from file
      *   @throws bmp::Exception on error

@@ -29,13 +29,13 @@ void printProgress(const double progress)
 
 std::mutex mutex;
 
-void CPU(int width, int height,
-         int new_width, int new_height,
-         int x_offset, int y_offset,
-         std::vector<std::vector<double>> invMatrix,
-         bmp::Bitmap input,
-         std::string out,
-         int threads_number)
+bmp::Bitmap CPU(int width, int height,
+                int new_width, int new_height,
+                int x_offset, int y_offset,
+                std::vector<std::vector<double>> invMatrix,
+                bmp::Bitmap input,
+
+                int threads_number)
 {
     bmp::Bitmap output(new_width, new_height);
 
@@ -85,17 +85,16 @@ void CPU(int width, int height,
 
     printProgress(1);
 
-    output.save(out);
-
     std::cout << std::endl;
+
+    return output;
 }
 
-void GPU(int width, int height,
-         int new_width, int new_height,
-         int x_offset, int y_offset,
-         std::vector<std::vector<double>> invMatrix,
-         bmp::Bitmap input,
-         std::string out)
+bmp::Bitmap GPU(int width, int height,
+                int new_width, int new_height,
+                int x_offset, int y_offset,
+                std::vector<std::vector<double>> invMatrix,
+                bmp::Bitmap input)
 {
     init(new_width, new_height);
 
@@ -121,7 +120,8 @@ void GPU(int width, int height,
     int buffer_width = ceil(new_width / 4.0) * 4,
         buffer_height = ceil(new_height / 4.0) * 4;
 
-    unsigned char *pixels = new unsigned char[buffer_width * buffer_height * 3];
+    bmp::Bitmap output(buffer_width, buffer_height);
+    auto pixels = reinterpret_cast<unsigned char *>(output.m_pixels.data());
     glReadPixels(0, 0, buffer_width, buffer_height, GL_RGB, GL_UNSIGNED_BYTE, pixels);
 
     glDeleteProgram(ShaderProgram);
@@ -132,11 +132,7 @@ void GPU(int width, int height,
     glDeleteBuffers(1, &VBO);
     glDeleteVertexArrays(1, &VAO);
 
-    bmp::Bitmap output(buffer_width, buffer_height);
-
-    output.save(out, pixels);
-
-    delete[] pixels;
-
     glfwTerminate();
+
+    return output;
 }

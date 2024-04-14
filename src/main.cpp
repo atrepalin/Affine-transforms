@@ -208,26 +208,30 @@ int main(int argc, char *argv[])
 
         std::string out = vm["output-file"].as<std::string>();
 
+        bmp::Bitmap output;
+
         if (device == 1)
         {
-            CPU(width, height,
-                new_width, new_height,
-                x_offset, y_offset,
-                invMatrix, input,
-                out, threads_number);
+            output = CPU(width, height,
+                         new_width, new_height,
+                         x_offset, y_offset,
+                         invMatrix, input,
+                         threads_number);
         }
         else if (device == 2)
         {
-            GPU(width, height,
-                new_width, new_height,
-                x_offset, y_offset,
-                invMatrix, input, out);
+            output = GPU(width, height,
+                         new_width, new_height,
+                         x_offset, y_offset,
+                         invMatrix, input);
         }
         else
         {
             std::cout << "Invalid render device" << std::endl;
             return 1;
         }
+
+        output.save(out);
 
         std::cout << "Done" << std::endl;
 
