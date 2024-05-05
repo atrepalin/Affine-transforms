@@ -569,6 +569,10 @@ namespace bmp
           throw Exception("Bitmap::Load(\"" + filename + "\"): Only 24 bits per pixel bitmaps supported.");
         }
 
+        auto offset = header->offset_bits - 54;
+
+        ifs.seekg(offset, std::ios::cur);
+
         // Set width & height
         m_width = header->width;
         m_height = header->height;
