@@ -74,24 +74,28 @@ int main(int argc, char *argv[])
         horizontal_skew,
         vertical_skew;
 
-    int threads_number;
-    int device;
+    int threads_number,
+        device,
+        x,
+        y;
 
     po::options_description desc("Allowed options");
     desc
-        .add_options()                                                                                                                     // prettier-ignore
-        ("help,h", "produce help message")                                                                                                 // prettier-ignore
-        ("angle,a", po::value<double>(&angle)->default_value(0), "rotation angle")                                                         // prettier-ignore
-        ("hsc", po::value<double>(&horizontal_scale)->default_value(1), "horizontal scale factor")                                         // prettier-ignore
-        ("vsc", po::value<double>(&vertical_scale)->default_value(1), "vertical scale factor")                                             // prettier-ignore
-        ("scale,s", po::value<double>(&scale), "scale factor (overrides hsc and vsc)")                                                     // prettier-ignore
-        ("hsk", po::value<double>(&horizontal_skew)->default_value(0), "horizontal skew angle")                                            // prettier-ignore
-        ("vsk", po::value<double>(&vertical_skew)->default_value(0), "vertical skew angle")                                                // prettier-ignore
-        ("hf", "horizontal flip")                                                                                                          // prettier-ignore
-        ("vf", "vertical flip")                                                                                                            // prettier-ignore
-        ("matrix,m", po::value<std::vector<double>>()->multitoken(), "transformation matrix (2x2 as a1 a2 b1 b2) (overrides all options)") // prettier-ignore
-        ("device,d", po::value<int>(&device)->default_value(1), "render device: 1) CPU 2) GPU")                                            // prettier-ignore
-        ("threads,t", po::value<int>(&threads_number)->default_value(1), "threads count (available only for CPU rendering)");              // prettier-ignore
+        .add_options()                                                                                                        // prettier-ignore
+        ("help,h", "produce help message")                                                                                    // prettier-ignore
+        ("angle,a", po::value<double>(&angle)->default_value(0), "rotation angle")                                            // prettier-ignore
+        ("hsc", po::value<double>(&horizontal_scale)->default_value(1), "horizontal scale factor")                            // prettier-ignore
+        ("vsc", po::value<double>(&vertical_scale)->default_value(1), "vertical scale factor")                                // prettier-ignore
+        ("scale,s", po::value<double>(&scale), "scale factor (overrides hsc and vsc)")                                        // prettier-ignore
+        ("hsk", po::value<double>(&horizontal_skew)->default_value(0), "horizontal skew angle")                               // prettier-ignore
+        ("vsk", po::value<double>(&vertical_skew)->default_value(0), "vertical skew angle")                                   // prettier-ignore
+        ("xtranslate,x", po::value<int>(&x)->default_value(0), "x translate")                                                 // prettier-ignore
+        ("ytranslate,y", po::value<int>(&y)->default_value(0), "y translate")                                                 // prettier-ignore
+        ("hf", "horizontal flip")                                                                                             // prettier-ignore
+        ("vf", "vertical flip")                                                                                               // prettier-ignore
+        ("matrix,m", po::value<std::vector<double>>()->multitoken(), "transformation matrix (2x3) (overrides all options)")   // prettier-ignore
+        ("device,d", po::value<int>(&device)->default_value(1), "render device: 1) CPU 2) GPU")                               // prettier-ignore
+        ("threads,t", po::value<int>(&threads_number)->default_value(1), "threads count (available only for CPU rendering)"); // prettier-ignore
 
     po::options_description hidden;
     hidden.add_options()                           // prettier-ignore
@@ -177,7 +181,7 @@ int main(int argc, char *argv[])
     {
         auto vector = vm["matrix"].as<std::vector<double>>();
 
-        if (vector.size() != 4)
+        if (vector.size() != 6)
         {
             std::cout << "Transform matrix is invalid" << std::endl;
             return 1;
@@ -185,8 +189,10 @@ int main(int argc, char *argv[])
 
         matrix = {
             {vector[0], vector[1], 0},
-            {vector[2], vector[3], 0},
+            {vector[3], vector[4], 0},
             {0, 0, 1}};
+
+        x = vector[2], y = vector[5];
     }
 
     auto invMatrix = inverseMatrix(matrix);
@@ -209,18 +215,18 @@ int main(int argc, char *argv[])
         auto transformedCorners = map(corners, [matrix](const auto corner)
                                       { return multiplyMatrices(corner, matrix); });
 
-        auto x = map(transformedCorners, [](const auto corner)
-                     { return (int)ceil(corner[0][0]); }),
-             y = map(transformedCorners, [](const auto corner)
-                     { return (int)ceil(corner[0][1]); });
+        auto xs = map(transformedCorners, [](const auto corner)
+                      { return (int)ceil(corner[0][0]); }),
+             ys = map(transformedCorners, [](const auto corner)
+                      { return (int)ceil(corner[0][1]); });
 
-        auto horizontal = std::minmax_element(std::begin(x), std::end(x)),
-             vertical = std::minmax_element(std::begin(y), std::end(y));
+        auto horizontal = std::minmax_element(std::begin(xs), std::end(xs)),
+             vertical = std::minmax_element(std::begin(ys), std::end(ys));
 
-        int new_width = *horizontal.second - *horizontal.first,
-            new_height = *vertical.second - *vertical.first,
-            x_offset = *horizontal.first,
-            y_offset = *vertical.first;
+        int new_width = *horizontal.second - *horizontal.first + std::abs(x),
+            new_height = *vertical.second - *vertical.first + std::abs(y),
+            x_offset = *horizontal.first - std::max(0, x),
+            y_offset = *vertical.first - std::max(0, y);
 
         std::string out = vm["output-file"].as<std::string>();
 
