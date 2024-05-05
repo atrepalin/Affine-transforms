@@ -90,9 +90,9 @@ bmp::Bitmap CPURender(int width, int height,
                                 iy = std::floor(y);
 
                             auto p1 = input.get(ix, iy),
-                                 p2 = input.get(ix + (ix < width), iy),
-                                 p3 = input.get(ix, iy + (iy < height)),
-                                 p4 = input.get(ix + (ix < width), iy + (iy < width));
+                                 p2 = input.get(ix + (ix < width - 1), iy),
+                                 p3 = input.get(ix, iy + (iy < height - 1)),
+                                 p4 = input.get(ix + (ix < width - 1), iy + (iy < height - 1));
 
                             double t = x - ix,
                                    u = y - iy,
